@@ -1,0 +1,40 @@
+modLoader="javafml" #mandatory
+
+loaderVersion="[32,)" #mandatory
+
+authors="Shadows_of_Fire" #optional
+
+license="MIT License" #mandatory
+
+[[mods]] #mandatory
+
+modId="fastsuite" #mandatory
+
+version="${file.jarVersion}" #mandatory
+
+displayName="FastSuite" #mandatory
+
+description='''
+Fast things
+'''
+
+[[dependencies.fastsuite]] #optional
+    modId="forge" #mandatory
+    mandatory=true #mandatory
+    versionRange="[35.1.36,)" #mandatory
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.fastsuite]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.16.4,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.fastsuite]]
+    modId="placebo"
+    mandatory=true
+    versionRange="[4.4,)"
+    ordering="NONE"
+    side="BOTH"

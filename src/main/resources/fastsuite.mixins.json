@@ -1,0 +1,10 @@
+{
+	"required": true,
+	"package": "shadows.fastsuite.mixin",
+	"compatibilityLevel": "JAVA_8",
+	"refmap": "fastsuite.refmap.json",
+	"mixins": [
+		"MixinDataPackRegistries"
+	],
+	"minVersion": "0.8"
+}
