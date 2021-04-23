@@ -116,6 +116,7 @@ public class AuxRecipeManager extends RecipeManager {
 			if (head == null) tail = head = node;
 			else {
 				node.next = head;
+				head.prev = node;
 				head = node;
 			}
 		}
@@ -175,6 +176,11 @@ public class AuxRecipeManager extends RecipeManager {
 
 		public RecipeNode(IRecipe<I> r) {
 			this.r = r;
+		}
+
+		@Override
+		public String toString() {
+			return String.format("RecipeNode(%s)", this.r.getId());
 		}
 	}
 }
