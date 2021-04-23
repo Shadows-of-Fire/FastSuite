@@ -39,10 +39,13 @@ public class AuxRecipeManager extends RecipeManager {
 
 	public void processInitialRecipes(Map<IRecipeType<?>, Map<ResourceLocation, IRecipe<?>>> recipes) {
 		this.linkedRecipes.clear();
+		long recipeCount = 0;
 		for (Map.Entry<IRecipeType<?>, Map<ResourceLocation, IRecipe<?>>> e : recipes.entrySet()) {
 			LinkedRecipeList<?> list = new LinkedRecipeList<>((Collection) e.getValue().values());
 			this.linkedRecipes.put(e.getKey(), list);
+			recipeCount += e.getValue().size();
 		}
+		FastSuite.LOG.info("Successfully processed {} recipes into the AuxRecipeManager.", recipeCount);
 		active = true;
 	}
 
