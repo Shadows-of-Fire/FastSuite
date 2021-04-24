@@ -139,15 +139,17 @@ public class AuxRecipeManager extends RecipeManager {
 
 		IRecipe<I> findFirstMatch(I inv, World world) {
 			RecipeNode<I> temp = head;
+			int idx = 0;
 			while (temp != null) {
 				if (temp.r.matches(inv, world)) {
-					if (temp != head) {
+					if (idx > 100) {
 						remove(temp);
 						addToHead(temp);
 					}
 					return temp.r;
 				}
 				temp = temp.next;
+				idx++;
 			}
 			return null;
 		}
@@ -155,10 +157,11 @@ public class AuxRecipeManager extends RecipeManager {
 		List<IRecipe<I>> findAllMatches(I inv, World world) {
 			RecipeNode<I> temp = head;
 			List<IRecipe<I>> ret = null;
+			int idx = 0;
 			while (temp != null) {
 				if (temp.r.matches(inv, world)) {
 					RecipeNode<I> next = temp.next;
-					if (temp != head) {
+					if (idx > 100) {
 						remove(temp);
 						addToHead(temp);
 					}
@@ -166,6 +169,7 @@ public class AuxRecipeManager extends RecipeManager {
 					ret.add(temp.r);
 					temp = next;
 				} else temp = temp.next;
+				idx++;
 			}
 			return ret == null ? Collections.emptyList() : ret;
 		}
