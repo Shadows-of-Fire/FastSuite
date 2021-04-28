@@ -142,7 +142,7 @@ public class AuxRecipeManager extends RecipeManager {
 			int idx = 0;
 			while (temp != null) {
 				if (temp.r.matches(inv, world)) {
-					if (idx > 100) {
+					if (idx > FastSuite.cacheSize) {
 						remove(temp);
 						addToHead(temp);
 					}
@@ -161,7 +161,7 @@ public class AuxRecipeManager extends RecipeManager {
 			while (temp != null) {
 				if (temp.r.matches(inv, world)) {
 					RecipeNode<I> next = temp.next;
-					if (idx > 100) {
+					if (idx > FastSuite.cacheSize) {
 						remove(temp);
 						addToHead(temp);
 					}
