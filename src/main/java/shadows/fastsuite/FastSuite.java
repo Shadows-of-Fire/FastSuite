@@ -16,7 +16,7 @@ public class FastSuite {
 
 	public FastSuite() {
 		Configuration cfg = new Configuration(MODID);
-		cacheSize = cfg.getInt("Cache Size", "general", 100, 10, 5000, "The amount of recipes that will be cached by FastSuite.  This means that a recipe will not be pushed to the front of the list if it is within the first <n> recipes.");
+		cacheSize = cfg.getInt("Cache Size", "general", 100, 1, 100000, "The amount of recipes that will be cached by FastSuite.  This means that a recipe will not be pushed to the front of the list if it is within the first <n> recipes.");
 		if (cfg.hasChanged()) cfg.save();
 	}
 }
