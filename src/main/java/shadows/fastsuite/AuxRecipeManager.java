@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import com.google.gson.JsonElement;
 
+import net.minecraft.inventory.CraftingInventory;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
@@ -57,15 +58,6 @@ public class AuxRecipeManager extends RecipeManager {
 		return Optional.ofNullable(recipe);
 	}
 
-	@Override
-	public <C extends IInventory, T extends IRecipe<C>> List<T> getRecipes(IRecipeType<T> type, C inv, World world) {
-		if (!active) return super.getRecipes(type, inv, world);
-		LinkedRecipeList<C> list = getRecipes(type);
-		List<T> recipes = (List) list.findAllMatches(inv, world);
-		recipes.sort(Comparator.comparing(r -> r.getRecipeOutput().getTranslationKey()));
-		return recipes;
-	}
-
 	private <C extends IInventory, T extends IRecipe<C>> LinkedRecipeList<C> getRecipes(IRecipeType<T> type) {
 		return (LinkedRecipeList) linkedRecipes.getOrDefault(type, LinkedRecipeList.EMPTY);
 	}
@@ -102,7 +94,7 @@ public class AuxRecipeManager extends RecipeManager {
 
 		public LinkedRecipeList(Collection<IRecipe<I>> recipes) {
 			for (IRecipe<I> r : recipes) {
-				add(new RecipeNode<>(r));
+				if (r != null) add(new RecipeNode<>(r));
 			}
 		}
 
@@ -141,7 +133,7 @@ public class AuxRecipeManager extends RecipeManager {
 			RecipeNode<I> temp = head;
 			int idx = 0;
 			while (temp != null) {
-				if (temp.r.matches(inv, world)) {
+				if (temp.matches(inv, world)) {
 					if (idx > FastSuite.cacheSize) {
 						remove(temp);
 						addToHead(temp);
@@ -152,26 +144,6 @@ public class AuxRecipeManager extends RecipeManager {
 				idx++;
 			}
 			return null;
-		}
-
-		List<IRecipe<I>> findAllMatches(I inv, World world) {
-			RecipeNode<I> temp = head;
-			List<IRecipe<I>> ret = null;
-			int idx = 0;
-			while (temp != null) {
-				if (temp.r.matches(inv, world)) {
-					RecipeNode<I> next = temp.next;
-					if (idx > FastSuite.cacheSize) {
-						remove(temp);
-						addToHead(temp);
-					}
-					if (ret == null) ret = new ArrayList<>();
-					ret.add(temp.r);
-					temp = next;
-				} else temp = temp.next;
-				idx++;
-			}
-			return ret == null ? Collections.emptyList() : ret;
 		}
 
 	}
@@ -188,6 +160,17 @@ public class AuxRecipeManager extends RecipeManager {
 		@Override
 		public String toString() {
 			return String.format("RecipeNode(%s)", this.r.getId());
+		}
+
+		boolean matches(I inv, World world) {
+			return canFit(inv) && r.matches(inv, world);
+		}
+
+		boolean canFit(I inv) {
+			if (inv instanceof CraftingInventory) {
+				return r.canFit(((CraftingInventory) inv).getWidth(), ((CraftingInventory) inv).getHeight());
+			}
+			return true;
 		}
 	}
 }
