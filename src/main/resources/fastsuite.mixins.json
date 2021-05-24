@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_8",
 	"refmap": "fastsuite.refmap.json",
 	"mixins": [
-		"MixinDataPackRegistries"
+		"MixinDataPackRegistries",
+		"MixinClientPlayNetHandler"
 	],
 	"minVersion": "0.8"
 }

@@ -11,8 +11,8 @@ buildscript {
     }
 }
 apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'eclipse'
 apply plugin: 'org.spongepowered.mixin'
+apply plugin: 'eclipse'
 
 archivesBaseName = name + '-' + mcVersion
 
