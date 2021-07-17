@@ -1,17 +1,16 @@
 package shadows.fastsuite.mixin;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.command.Commands;
 import net.minecraft.item.crafting.RecipeManager;
 import net.minecraft.resources.DataPackRegistries;
-import net.minecraft.resources.IReloadableResourceManager;
 import shadows.fastsuite.AuxRecipeManager;
-import shadows.placebo.util.RunnableReloader;
 
 @Mixin(DataPackRegistries.class)
 public class MixinDataPackRegistries {
@@ -19,11 +18,11 @@ public class MixinDataPackRegistries {
 	@Shadow
 	private final RecipeManager recipeManager = new AuxRecipeManager();
 
-	@Inject(at = @At("TAIL"), method = "<init>(Lnet/minecraft/command/Commands$EnvironmentType;I)V")
-	private void init(Commands.EnvironmentType envType, int permissionsLevel, CallbackInfo info) {
-		DataPackRegistries dpr = (DataPackRegistries) (Object) this;
-		((IReloadableResourceManager) dpr.getResourceManager()).addReloadListener(RunnableReloader.of(() -> {
+	@Inject(at = @At("TAIL"), method = "func_240961_a_(Ljava/util/List;Lnet/minecraft/command/Commands$EnvironmentType;ILjava/util/concurrent/Executor;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;", cancellable = true)
+	private static void func_240961_a_(CallbackInfoReturnable<CompletableFuture<DataPackRegistries>> info) {
+		info.setReturnValue(info.getReturnValue().thenApply((dpr) -> {
 			((AuxRecipeManager) dpr.getRecipeManager()).processInitialRecipes(dpr.getRecipeManager().recipes);
+			return dpr;
 		}));
 	}
 

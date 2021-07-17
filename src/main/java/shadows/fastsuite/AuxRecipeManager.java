@@ -8,7 +8,6 @@ import java.util.Optional;
 
 import com.google.gson.JsonElement;
 
-import net.minecraft.inventory.CraftingInventory;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
@@ -81,6 +80,18 @@ public class AuxRecipeManager extends RecipeManager {
 		super.deserializeRecipes(recipes);
 		processInitialRecipes(super.recipes);
 	};
+
+	public void dump() {
+		for (Map.Entry<IRecipeType<?>, LinkedRecipeList<?>> e : linkedRecipes.entrySet()) {
+			FastSuite.LOG.info("Recipes for type {}:", e.getKey().toString());
+			LinkedRecipeList<?> list = e.getValue();
+			RecipeNode<?> temp = list.head;
+			while (temp != null) {
+				FastSuite.LOG.info("{}", temp.r.getId());
+				temp = temp.next;
+			}
+		}
+	}
 
 	public static class LinkedRecipeList<I extends IInventory> {
 
@@ -160,14 +171,7 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 
 		boolean matches(I inv, World world) {
-			return canFit(inv) && r.matches(inv, world);
-		}
-
-		boolean canFit(I inv) {
-			if (inv instanceof CraftingInventory) {
-				return r.canFit(((CraftingInventory) inv).getWidth(), ((CraftingInventory) inv).getHeight());
-			}
-			return true;
+			return r.matches(inv, world);
 		}
 	}
 }
