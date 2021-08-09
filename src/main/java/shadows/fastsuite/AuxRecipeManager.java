@@ -125,11 +125,14 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 
 		void remove(RecipeNode<I> node) {
-			if (node == head) {
+			if (node == head && node == tail) {
+				head = tail = null;
+			} else if (node == head) {
 				head = head.next;
-			}
-			if (node == tail) {
+				if (head != null) head.prev = null;
+			} else if (node == tail) {
 				tail = tail.prev;
+				if (tail != null) tail.next = null;
 			} else {
 				node.prev.next = node.next;
 				node.next.prev = node.prev;
@@ -138,22 +141,23 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 
 		IRecipe<I> findFirstMatch(I inv, World world) {
-			RecipeNode<I> temp = head;
-			int idx = 0;
-			while (temp != null) {
-				if (temp.matches(inv, world)) {
-					if (idx > FastSuite.cacheSize) {
-						remove(temp);
-						addToHead(temp);
+			synchronized (this) {
+				RecipeNode<I> temp = head;
+				int idx = 0;
+				while (temp != null) {
+					if (temp.matches(inv, world)) {
+						if (idx > FastSuite.cacheSize) {
+							remove(temp);
+							addToHead(temp);
+						}
+						return temp.r;
 					}
-					return temp.r;
+					temp = temp.next;
+					idx++;
 				}
-				temp = temp.next;
-				idx++;
+				return null;
 			}
-			return null;
 		}
-
 	}
 
 	public static class RecipeNode<I extends IInventory> {
