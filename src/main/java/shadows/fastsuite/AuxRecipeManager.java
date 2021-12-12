@@ -8,16 +8,16 @@ import java.util.Optional;
 
 import com.google.gson.JsonElement;
 
-import net.minecraft.inventory.IInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.crafting.IRecipe;
-import net.minecraft.item.crafting.IRecipeType;
-import net.minecraft.item.crafting.RecipeManager;
-import net.minecraft.profiler.IProfiler;
-import net.minecraft.resources.IResourceManager;
-import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class AuxRecipeManager extends RecipeManager {
@@ -27,17 +27,17 @@ public class AuxRecipeManager extends RecipeManager {
 	/**
 	 * Master Map of recipes.  Recipe lists are stored as LinkedLists, which have a faster insertion at head and removal speed.
 	 */
-	private final Map<IRecipeType<?>, LinkedRecipeList<?>> linkedRecipes = new HashMap<>();
+	private final Map<RecipeType<?>, LinkedRecipeList<?>> linkedRecipes = new HashMap<>();
 
-	protected void apply(Map<ResourceLocation, JsonElement> objectIn, IResourceManager resourceManagerIn, IProfiler profilerIn) {
+	protected void apply(Map<ResourceLocation, JsonElement> objectIn, ResourceManager resourceManagerIn, ProfilerFiller profilerIn) {
 		active = false;
 		super.apply(objectIn, resourceManagerIn, profilerIn);
 	};
 
-	public void processInitialRecipes(Map<IRecipeType<?>, Map<ResourceLocation, IRecipe<?>>> recipes) {
+	public void processInitialRecipes(Map<RecipeType<?>, Map<ResourceLocation, Recipe<?>>> recipes) {
 		this.linkedRecipes.clear();
 		long recipeCount = 0;
-		for (Map.Entry<IRecipeType<?>, Map<ResourceLocation, IRecipe<?>>> e : recipes.entrySet()) {
+		for (Map.Entry<RecipeType<?>, Map<ResourceLocation, Recipe<?>>> e : recipes.entrySet()) {
 			LinkedRecipeList<?> list = new LinkedRecipeList<>((Collection) e.getValue().values());
 			this.linkedRecipes.put(e.getKey(), list);
 			recipeCount += e.getValue().size();
@@ -47,42 +47,43 @@ public class AuxRecipeManager extends RecipeManager {
 	}
 
 	@Override
-	public <C extends IInventory, T extends IRecipe<C>> Optional<T> getRecipe(IRecipeType<T> type, C inv, World world) {
-		if (!active) return super.getRecipe(type, inv, world);
+	public <C extends Container, T extends Recipe<C>> Optional<T> getRecipeFor(RecipeType<T> type, C inv, Level world) {
+		if (!active) return super.getRecipeFor(type, inv, world);
 		LinkedRecipeList<C> list = getRecipes(type);
 		T recipe = (T) list.findFirstMatch(inv, world);
 		return Optional.ofNullable(recipe);
 	}
 
-	private <C extends IInventory, T extends IRecipe<C>> LinkedRecipeList<C> getRecipes(IRecipeType<T> type) {
+	private <C extends Container, T extends Recipe<C>> LinkedRecipeList<C> getRecipes(RecipeType<T> type) {
 		return (LinkedRecipeList) linkedRecipes.getOrDefault(type, LinkedRecipeList.EMPTY);
 	}
 
 	@Override
-	public <C extends IInventory, T extends IRecipe<C>> NonNullList<ItemStack> getRecipeNonNull(IRecipeType<T> type, C inv, World world) {
-		if (!active) return super.getRecipeNonNull(type, inv, world);
+	public <C extends Container, T extends Recipe<C>> NonNullList<ItemStack> getRemainingItemsFor(RecipeType<T> type, C inv, Level world) {
+		if (!active) return super.getRemainingItemsFor(type, inv, world);
 		LinkedRecipeList<C> list = getRecipes(type);
 		T recipe = (T) list.findFirstMatch(inv, world);
 		if (recipe != null) {
 			return recipe.getRemainingItems(inv);
 		} else {
-			NonNullList<ItemStack> nonnulllist = NonNullList.withSize(inv.getSizeInventory(), ItemStack.EMPTY);
+			NonNullList<ItemStack> nonnulllist = NonNullList.withSize(inv.getContainerSize(), ItemStack.EMPTY);
 
 			for (int i = 0; i < nonnulllist.size(); ++i) {
-				nonnulllist.set(i, inv.getStackInSlot(i));
+				nonnulllist.set(i, inv.getItem(i));
 			}
 
 			return nonnulllist;
 		}
 	}
 
-	public void deserializeRecipes(Iterable<IRecipe<?>> recipes) {
-		super.deserializeRecipes(recipes);
+	@Override
+	public void replaceRecipes(Iterable<Recipe<?>> recipes) {
+		super.replaceRecipes(recipes);
 		processInitialRecipes(super.recipes);
 	};
 
 	public void dump() {
-		for (Map.Entry<IRecipeType<?>, LinkedRecipeList<?>> e : linkedRecipes.entrySet()) {
+		for (Map.Entry<RecipeType<?>, LinkedRecipeList<?>> e : linkedRecipes.entrySet()) {
 			FastSuite.LOG.info("Recipes for type {}:", e.getKey().toString());
 			LinkedRecipeList<?> list = e.getValue();
 			RecipeNode<?> temp = list.head;
@@ -93,15 +94,15 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 	}
 
-	public static class LinkedRecipeList<I extends IInventory> {
+	public static class LinkedRecipeList<I extends Container> {
 
-		public static final LinkedRecipeList<IInventory> EMPTY = new LinkedRecipeList<>(Collections.emptyList());
+		public static final LinkedRecipeList<Container> EMPTY = new LinkedRecipeList<>(Collections.emptyList());
 
 		RecipeNode<I> head;
 		RecipeNode<I> tail;
 
-		public LinkedRecipeList(Collection<IRecipe<I>> recipes) {
-			for (IRecipe<I> r : recipes) {
+		public LinkedRecipeList(Collection<Recipe<I>> recipes) {
+			for (Recipe<I> r : recipes) {
 				if (r != null) add(new RecipeNode<>(r));
 			}
 		}
@@ -140,7 +141,7 @@ public class AuxRecipeManager extends RecipeManager {
 			node.next = node.prev = null;
 		}
 
-		IRecipe<I> findFirstMatch(I inv, World world) {
+		Recipe<I> findFirstMatch(I inv, Level world) {
 			synchronized (this) {
 				RecipeNode<I> temp = head;
 				int idx = 0;
@@ -160,12 +161,12 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 	}
 
-	public static class RecipeNode<I extends IInventory> {
-		final IRecipe<I> r;
+	public static class RecipeNode<I extends Container> {
+		final Recipe<I> r;
 		RecipeNode<I> next;
 		RecipeNode<I> prev;
 
-		public RecipeNode(IRecipe<I> r) {
+		public RecipeNode(Recipe<I> r) {
 			this.r = r;
 		}
 
@@ -174,7 +175,7 @@ public class AuxRecipeManager extends RecipeManager {
 			return String.format("RecipeNode(%s)", this.r.getId());
 		}
 
-		boolean matches(I inv, World world) {
+		boolean matches(I inv, Level world) {
 			return r.matches(inv, world);
 		}
 	}

@@ -1,13 +1,13 @@
 {
     "required": true,
-    "package": "shadows.fastsuite.mixin",
+    "package": "shadows.${modid}.mixin",
     "compatibilityLevel": "JAVA_8",
-    "refmap": "fastsuite.refmap.json",
+    "refmap": "${modid}.refmap.json",
     "mixins": [
-        "MixinDataPackRegistries"
+        ${mixins}
     ],
     "client": [
-        "MixinClientPlayNetHandler"
+        ${clientMixins}
     ],
     "minVersion": "0.8"
 }
