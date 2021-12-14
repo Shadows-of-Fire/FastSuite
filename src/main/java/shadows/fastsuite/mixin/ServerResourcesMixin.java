@@ -20,7 +20,7 @@ public class ServerResourcesMixin {
 
 	@Inject(at = @At("TAIL"), method = "loadResources(Ljava/util/List;Lnet/minecraft/core/RegistryAccess;Lnet/minecraft/commands/Commands$CommandSelection;ILjava/util/concurrent/Executor;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;", cancellable = true)
 	private static void func_240961_a_(CallbackInfoReturnable<CompletableFuture<ServerResources>> info) {
-		info.setReturnValue(info.getReturnValue().thenApply((dpr) -> {
+		info.setReturnValue(info.getReturnValue().thenApply(dpr -> {
 			((AuxRecipeManager) dpr.getRecipeManager()).processInitialRecipes(dpr.getRecipeManager().recipes);
 			return dpr;
 		}));

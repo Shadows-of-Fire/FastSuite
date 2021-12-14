@@ -8,15 +8,15 @@ import java.util.Optional;
 
 import com.google.gson.JsonElement;
 
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraft.util.profiling.ProfilerFiller;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.core.NonNullList;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -29,8 +29,9 @@ public class AuxRecipeManager extends RecipeManager {
 	 */
 	private final Map<RecipeType<?>, LinkedRecipeList<?>> linkedRecipes = new HashMap<>();
 
+	@Override
 	protected void apply(Map<ResourceLocation, JsonElement> objectIn, ResourceManager resourceManagerIn, ProfilerFiller profilerIn) {
-		active = false;
+		this.active = false;
 		super.apply(objectIn, resourceManagerIn, profilerIn);
 	};
 
@@ -43,25 +44,25 @@ public class AuxRecipeManager extends RecipeManager {
 			recipeCount += e.getValue().size();
 		}
 		FastSuite.LOG.info("Successfully processed {} recipes into the AuxRecipeManager.", recipeCount);
-		active = true;
+		this.active = true;
 	}
 
 	@Override
 	public <C extends Container, T extends Recipe<C>> Optional<T> getRecipeFor(RecipeType<T> type, C inv, Level world) {
-		if (!active) return super.getRecipeFor(type, inv, world);
-		LinkedRecipeList<C> list = getRecipes(type);
+		if (!this.active) return super.getRecipeFor(type, inv, world);
+		LinkedRecipeList<C> list = this.getRecipes(type);
 		T recipe = (T) list.findFirstMatch(inv, world);
 		return Optional.ofNullable(recipe);
 	}
 
 	private <C extends Container, T extends Recipe<C>> LinkedRecipeList<C> getRecipes(RecipeType<T> type) {
-		return (LinkedRecipeList) linkedRecipes.getOrDefault(type, LinkedRecipeList.EMPTY);
+		return (LinkedRecipeList) this.linkedRecipes.getOrDefault(type, LinkedRecipeList.EMPTY);
 	}
 
 	@Override
 	public <C extends Container, T extends Recipe<C>> NonNullList<ItemStack> getRemainingItemsFor(RecipeType<T> type, C inv, Level world) {
-		if (!active) return super.getRemainingItemsFor(type, inv, world);
-		LinkedRecipeList<C> list = getRecipes(type);
+		if (!this.active) return super.getRemainingItemsFor(type, inv, world);
+		LinkedRecipeList<C> list = this.getRecipes(type);
 		T recipe = (T) list.findFirstMatch(inv, world);
 		if (recipe != null) {
 			return recipe.getRemainingItems(inv);
@@ -79,11 +80,11 @@ public class AuxRecipeManager extends RecipeManager {
 	@Override
 	public void replaceRecipes(Iterable<Recipe<?>> recipes) {
 		super.replaceRecipes(recipes);
-		processInitialRecipes(super.recipes);
+		this.processInitialRecipes(super.recipes);
 	};
 
 	public void dump() {
-		for (Map.Entry<RecipeType<?>, LinkedRecipeList<?>> e : linkedRecipes.entrySet()) {
+		for (Map.Entry<RecipeType<?>, LinkedRecipeList<?>> e : this.linkedRecipes.entrySet()) {
 			FastSuite.LOG.info("Recipes for type {}:", e.getKey().toString());
 			LinkedRecipeList<?> list = e.getValue();
 			RecipeNode<?> temp = list.head;
@@ -103,37 +104,37 @@ public class AuxRecipeManager extends RecipeManager {
 
 		public LinkedRecipeList(Collection<Recipe<I>> recipes) {
 			for (Recipe<I> r : recipes) {
-				if (r != null) add(new RecipeNode<>(r));
+				if (r != null) this.add(new RecipeNode<>(r));
 			}
 		}
 
 		void add(RecipeNode<I> node) {
-			if (head == null) tail = head = node;
+			if (this.head == null) this.tail = this.head = node;
 			else {
-				tail.next = node;
-				node.prev = tail;
-				tail = node;
+				this.tail.next = node;
+				node.prev = this.tail;
+				this.tail = node;
 			}
 		}
 
 		void addToHead(RecipeNode<I> node) {
-			if (head == null) tail = head = node;
+			if (this.head == null) this.tail = this.head = node;
 			else {
-				node.next = head;
-				head.prev = node;
-				head = node;
+				node.next = this.head;
+				this.head.prev = node;
+				this.head = node;
 			}
 		}
 
 		void remove(RecipeNode<I> node) {
-			if (node == head && node == tail) {
-				head = tail = null;
-			} else if (node == head) {
-				head = head.next;
-				if (head != null) head.prev = null;
-			} else if (node == tail) {
-				tail = tail.prev;
-				if (tail != null) tail.next = null;
+			if (node == this.head && node == this.tail) {
+				this.head = this.tail = null;
+			} else if (node == this.head) {
+				this.head = this.head.next;
+				if (this.head != null) this.head.prev = null;
+			} else if (node == this.tail) {
+				this.tail = this.tail.prev;
+				if (this.tail != null) this.tail.next = null;
 			} else {
 				node.prev.next = node.next;
 				node.next.prev = node.prev;
@@ -143,13 +144,13 @@ public class AuxRecipeManager extends RecipeManager {
 
 		Recipe<I> findFirstMatch(I inv, Level world) {
 			synchronized (this) {
-				RecipeNode<I> temp = head;
+				RecipeNode<I> temp = this.head;
 				int idx = 0;
 				while (temp != null) {
 					if (temp.matches(inv, world)) {
 						if (idx > FastSuite.cacheSize) {
-							remove(temp);
-							addToHead(temp);
+							this.remove(temp);
+							this.addToHead(temp);
 						}
 						return temp.r;
 					}
@@ -176,7 +177,7 @@ public class AuxRecipeManager extends RecipeManager {
 		}
 
 		boolean matches(I inv, Level world) {
-			return r.matches(inv, world);
+			return this.r.matches(inv, world);
 		}
 	}
 }
