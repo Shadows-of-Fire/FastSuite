@@ -18,6 +18,7 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.common.crafting.conditions.ICondition;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class AuxRecipeManager extends RecipeManager {
@@ -28,6 +29,15 @@ public class AuxRecipeManager extends RecipeManager {
 	 * Master Map of recipes.  Recipe lists are stored as LinkedLists, which have a faster insertion at head and removal speed.
 	 */
 	private final Map<RecipeType<?>, LinkedRecipeList<?>> linkedRecipes = new HashMap<>();
+
+	@Deprecated
+	public AuxRecipeManager() {
+		super();
+	}
+
+	public AuxRecipeManager(ICondition.IContext context) {
+		super(context);
+	}
 
 	@Override
 	protected void apply(Map<ResourceLocation, JsonElement> objectIn, ResourceManager resourceManagerIn, ProfilerFiller profilerIn) {

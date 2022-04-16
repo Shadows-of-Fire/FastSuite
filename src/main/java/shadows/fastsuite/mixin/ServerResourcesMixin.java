@@ -9,14 +9,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.server.ReloadableServerResources;
+import net.minecraft.tags.TagManager;
 import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraftforge.common.crafting.conditions.ConditionContext;
 import shadows.fastsuite.AuxRecipeManager;
 
 @Mixin(ReloadableServerResources.class)
 public class ServerResourcesMixin {
 
 	@Shadow
-	private final RecipeManager recipes = new AuxRecipeManager();
+	private TagManager tagManager;
+
+	@Shadow
+	private final RecipeManager recipes = new AuxRecipeManager(new ConditionContext(this.tagManager));
 
 	@Inject(at = @At("TAIL"), method = "loadResources(Lnet/minecraft/server/packs/resources/ResourceManager;Lnet/minecraft/core/RegistryAccess$Frozen;Lnet/minecraft/commands/Commands$CommandSelection;ILjava/util/concurrent/Executor;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;", cancellable = true)
 	private static void loadResources(CallbackInfoReturnable<CompletableFuture<ReloadableServerResources>> info) {

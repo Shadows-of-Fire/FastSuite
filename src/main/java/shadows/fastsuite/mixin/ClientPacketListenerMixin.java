@@ -11,6 +11,7 @@ import shadows.fastsuite.AuxRecipeManager;
 public class ClientPacketListenerMixin {
 
 	@Shadow
+	@SuppressWarnings("deprecation")
 	private final RecipeManager recipeManager = new AuxRecipeManager();
 
 }
