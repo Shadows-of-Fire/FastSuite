@@ -1,3 +1,6 @@
+## 4.0.0
+* Updated to 1.19.2
+
 ## 3.0.2
 * Updated to support new ICondition$IContext feature.
 
