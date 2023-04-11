@@ -1,3 +1,6 @@
+## 4.1.0
+* Enabled concurrent recipe matching.
+
 ## 4.0.0
 * Updated to 1.19.2
 
