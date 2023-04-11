@@ -1,5 +1,11 @@
 ## 4.1.0
-* Enabled concurrent recipe matching.
+* Switched from the Linked List Cache model to a Concurrent Recipe Matching model.
+* This increases matching performance substantially as the number of recipes increases, without becoming useless when a mod like Polymorph is installed.
+  * This also means that with FS 4.1.0+, Polymorph will no longer incur a performance hit during recipe matching.
+* Concurrent Recipe Matching is automatically enabled for all Recipe Types which have more than 100 recipes.
+* Individual recipe types can be blacklisted in the config file if they exhibit problems with Concurrent Recipe Matching.
+  * If certain mods are having problems, you can report an issue to FastSuite and I will investigate if that mod can be made compatible, or add their recipe types to the default blacklist.
+* There is a configurable max time that a Concurrent Match operation may take, to prevent deadlocks (in the case that another mod somehow triggers a blocking operation from a recipe match worker thread).
 
 ## 4.0.0
 * Updated to 1.19.2
