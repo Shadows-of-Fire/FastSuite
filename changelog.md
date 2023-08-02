@@ -1,3 +1,6 @@
+## 4.1.1
+* Added a config to lock the input stacks during the parallel matching process.
+
 ## 4.1.0
 * Switched from the Linked List Cache model to a Concurrent Recipe Matching model.
 * This increases matching performance substantially as the number of recipes increases, without becoming useless when a mod like Polymorph is installed.

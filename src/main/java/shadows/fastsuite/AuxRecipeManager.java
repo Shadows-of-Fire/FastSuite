@@ -12,6 +12,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -39,24 +40,48 @@ public class AuxRecipeManager extends RecipeManager {
 	@Override
 	public <C extends Container, T extends Recipe<C>> Optional<T> getRecipeFor(RecipeType<T> type, C inv, Level level) {
 		if (numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) return super.getRecipeFor(type, inv, level);
-		return StreamUtils.executeUntil(() -> {
-			return this.byType(type).values().parallelStream().filter(recipe -> {
-				return recipe.matches(inv, level);
-			}).findFirst();
-		}, FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Optional.empty(), () -> timeoutMsg(type));
+		lockAllStacks(inv, true);
+		try {
+			return StreamUtils.executeUntil(() -> {
+				return this.byType(type).values().parallelStream().filter(recipe -> {
+					return recipe.matches(inv, level);
+				}).findFirst();
+			}, FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Optional.empty(), () -> timeoutMsg(type));
+		} catch (Exception ex) {
+			throw new RuntimeException(ex);
+		} finally {
+			lockAllStacks(inv, false);
+		}
 	}
 
 	@Override
 	public <C extends Container, T extends Recipe<C>> List<T> getRecipesFor(RecipeType<T> type, C inv, Level level) {
 		if (numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) return super.getRecipesFor(type, inv, level);
-		return StreamUtils.executeUntil(() -> {
-			return this.byType(type).values().parallelStream().filter((recipe) -> {
-				return recipe.matches(inv, level);
-			}).sorted(Comparator.comparing((recipe) -> {
-				return recipe.getResultItem().getDescriptionId();
-			})).collect(Collectors.toList());
-		}, FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Collections.emptyList(), () -> timeoutMsg(type));
+		lockAllStacks(inv, true);
+		try {
+			return StreamUtils.executeUntil(() -> {
+				return this.byType(type).values().parallelStream().filter((recipe) -> {
+					return recipe.matches(inv, level);
+				}).sorted(Comparator.comparing((recipe) -> {
+					return recipe.getResultItem().getDescriptionId();
+				})).collect(Collectors.toList());
+			}, FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Collections.emptyList(), () -> timeoutMsg(type));
+		} catch (Exception ex) {
+			throw new RuntimeException(ex);
+		} finally {
+			lockAllStacks(inv, false);
+		}
 	};
+
+	private <C extends Container> void lockAllStacks(C inv, boolean locked) {
+	    if (!FastSuite.lockInputStacks) return;
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (!s.isEmpty()) {
+				((ILockableItemStack) (Object) s).setLocked(locked);
+			}
+		}
+	}
 
 	private int numRecipesOf(RecipeType type) {
 		return this.byType(type).size();
