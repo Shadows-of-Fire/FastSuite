@@ -1,6 +1,7 @@
 package dev.shadowsoffire.fastsuite;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
@@ -14,13 +15,12 @@ import java.util.stream.Collectors;
 import com.google.common.base.Stopwatch;
 
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.Container;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * A cached list of recipes for a specific recipe type. This class is used to speed up recipe lookups by pre-sorting recipes into parallel and serial lists.
@@ -28,29 +28,29 @@ import net.minecraftforge.registries.ForgeRegistries;
  * A recipe is parallelizable if the recipe class and all ingredients are known to be thread-safe. All vanilla recipes are considered thread-safe.
  */
 @SuppressWarnings("deprecation")
-class CachedRecipeList<C extends Container, T extends Recipe<C>> {
+class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
 
     static final Map<Class<?>, Boolean> parallelRecipeClassCache = Collections.synchronizedMap(new IdentityHashMap<>());
     static final Map<Class<?>, Boolean> ingredientClassCache = Collections.synchronizedMap(new IdentityHashMap<>());
 
-    private final List<T> serialRecipes;
-    private final List<T> parallelRecipes;
+    private final List<RecipeHolder<T>> serialRecipes;
+    private final List<RecipeHolder<T>> parallelRecipes;
     private final RecipeType<T> type;
 
-    public CachedRecipeList(RecipeType<T> type, Map<ResourceLocation, T> recipeMap) {
+    public CachedRecipeList(RecipeType<T> type, Collection<RecipeHolder<T>> recipes) {
         this.type = type;
         this.serialRecipes = new ArrayList<>();
         this.parallelRecipes = new ArrayList<>();
         Stopwatch watch = Stopwatch.createStarted();
-        for (Map.Entry<ResourceLocation, T> entry : recipeMap.entrySet()) {
-            if (isParallelRecipe(entry.getValue()))
-                this.parallelRecipes.add(entry.getValue());
+        for (RecipeHolder<T> holder : recipes) {
+            if (isParallelRecipe(holder.value()))
+                this.parallelRecipes.add(holder);
             else
-                this.serialRecipes.add(entry.getValue());
+                this.serialRecipes.add(holder);
         }
         watch.stop();
         FastSuite.LOGGER.info("Constructed recipe list for {} in {}. {}/{} recipes are parallelized.",
-            ForgeRegistries.RECIPE_TYPES.getKey(type), watch, this.parallelRecipes.size(), recipeMap.size());
+            BuiltInRegistries.RECIPE_TYPE.getKey(type), watch, this.parallelRecipes.size(), recipes.size());
     }
 
     /**
@@ -58,9 +58,9 @@ class CachedRecipeList<C extends Container, T extends Recipe<C>> {
      * 
      * @implNote This method will need to be updated if/when Forge implements recipe priority.
      */
-    public Optional<T> getRecipeFor(C inv, Level level) {
-        Optional<T> parRecipe = StreamUtils.executeUntil(() -> this.parallelRecipes.parallelStream()
-            .filter(recipe -> recipe.matches(inv, level))
+    public Optional<RecipeHolder<T>> getRecipeFor(C inv, Level level) {
+        Optional<RecipeHolder<T>> parRecipe = StreamUtils.executeUntil(() -> this.parallelRecipes.parallelStream()
+            .filter(recipe -> recipe.value().matches(inv, level))
             .findFirst(),
             FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Optional.empty(), () -> timeoutMsg(type));
 
@@ -69,8 +69,8 @@ class CachedRecipeList<C extends Container, T extends Recipe<C>> {
         }
 
         // check serial recipes
-        for (T recipe : this.serialRecipes) {
-            if (recipe.matches(inv, level)) {
+        for (RecipeHolder<T> recipe : this.serialRecipes) {
+            if (recipe.value().matches(inv, level)) {
                 return Optional.of(recipe);
             }
         }
@@ -83,16 +83,16 @@ class CachedRecipeList<C extends Container, T extends Recipe<C>> {
      * <p>
      * In accordance with the contract of {@link RecipeType#getRecipesFor}, the returned list is sorted by the description ID of the result item.
      */
-    public List<T> getRecipesFor(C inv, Level level) {
-        Comparator<T> recipeSorter = Comparator.comparing((recipe) -> {
-            return recipe.getResultItem(level.registryAccess()).getDescriptionId();
+    public List<RecipeHolder<T>> getRecipesFor(C inv, Level level) {
+        Comparator<RecipeHolder<T>> recipeSorter = Comparator.comparing((recipe) -> {
+            return recipe.value().getResultItem(level.registryAccess()).getDescriptionId();
         });
 
-        Predicate<T> recipeFilter = (recipe) -> {
-            return recipe.matches(inv, level);
+        Predicate<RecipeHolder<T>> recipeFilter = (recipe) -> {
+            return recipe.value().matches(inv, level);
         };
 
-        List<T> parallelList = StreamUtils.executeUntil(() -> this.parallelRecipes
+        List<RecipeHolder<T>> parallelList = StreamUtils.executeUntil(() -> this.parallelRecipes
             .parallelStream()
             .filter(recipeFilter)
             .collect(Collectors.toCollection(ArrayList::new)),
@@ -131,10 +131,10 @@ class CachedRecipeList<C extends Container, T extends Recipe<C>> {
      * Checks if an Ingredient is parallelizable. All vanilla and Forge ingredients are safe.
      */
     private static boolean isSafeIngredient(Ingredient ingredient) {
-        if (ingredient.isVanilla())
+        if (!ingredient.isCustom())
             return true;
-        return ingredientClassCache.computeIfAbsent(ingredient.getClass(), clz -> {
-            return clz.getName().startsWith("net.minecraftforge.common.crafting.");
+        return ingredientClassCache.computeIfAbsent(ingredient.getCustomIngredient().getClass(), clz -> {
+            return clz.getName().startsWith("net.neoforged.neoforge.common.crafting.");
         });
     }
 

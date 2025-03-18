@@ -1,21 +1,29 @@
 package dev.shadowsoffire.fastsuite.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import dev.shadowsoffire.fastsuite.AuxRecipeManager;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.ReloadableServerResources;
-import net.minecraft.tags.TagManager;
+import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraftforge.common.crafting.conditions.ConditionContext;
 
 @Mixin(ReloadableServerResources.class)
 public class ServerResourcesMixin {
 
-	@Shadow
-	private TagManager tagManager;
+    @Shadow
+    @Mutable
+    private RecipeManager recipes;
 
-	@Shadow
-	private final RecipeManager recipes = new AuxRecipeManager(new ConditionContext(this.tagManager));
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void onInit(RegistryAccess.Frozen registryAccess, FeatureFlagSet enabledFeatures, Commands.CommandSelection commandSelection, int functionCompilationLevel, CallbackInfo ci) {
+        this.recipes = new AuxRecipeManager(registryAccess);
+    }
 
 }

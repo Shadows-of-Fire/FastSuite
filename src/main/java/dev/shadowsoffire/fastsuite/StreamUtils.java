@@ -4,6 +4,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -16,10 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import net.minecraft.ReportType;
 import net.minecraft.ReportedException;
 import net.minecraft.server.Bootstrap;
 
@@ -59,7 +60,7 @@ public class StreamUtils {
         }
 
         if (cause instanceof ReportedException) {
-            Bootstrap.realStdoutPrintln(((ReportedException) cause).getReport().getFriendlyReport());
+            Bootstrap.realStdoutPrintln(((ReportedException) cause).getReport().getFriendlyReport(ReportType.CRASH));
             System.exit(-1);
         }
 
@@ -127,8 +128,7 @@ public class StreamUtils {
         final Runnable runnable;
 
         private RunnableExecuteAction(Runnable runnable) {
-            Validate.notNull(runnable);
-            this.runnable = runnable;
+            this.runnable = Objects.requireNonNull(runnable);
         }
 
         @Override
@@ -151,8 +151,7 @@ public class StreamUtils {
         T rawResult;
 
         private CallableExecuteAction(Callable<T> callable) {
-            Validate.notNull(callable);
-            this.callable = callable;
+            this.callable = Objects.requireNonNull(callable);
         }
 
         @Override

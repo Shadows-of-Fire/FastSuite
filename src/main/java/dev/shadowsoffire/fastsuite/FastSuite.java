@@ -7,6 +7,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import dev.shadowsoffire.placebo.config.Configuration;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -14,22 +15,22 @@ import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
 @Mod(FastSuite.MODID)
 public class FastSuite {
 
     public static final String MODID = "fastsuite";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
-    public static boolean DEBUG = false;
+    public static boolean DEBUG = true;
     public static final int MIN_SIZE_REQUIRED_FOR_THREADING = 100;
 
     public static int maxRecipeLookupTime = 25;
@@ -37,11 +38,11 @@ public class FastSuite {
     public static boolean lockInputStacks = false;
     public static boolean unsafeMode = false;
 
-    public FastSuite() {
+    public FastSuite(IEventBus bus) {
         StreamUtils.setup(this);
-        FMLJavaModLoadingContext.get().getModEventBus().register(this);
+        bus.register(this);
         if (DEBUG) {
-            MinecraftForge.EVENT_BUS.addListener(this::test);
+            NeoForge.EVENT_BUS.addListener(this::test);
         }
     }
 
@@ -53,7 +54,7 @@ public class FastSuite {
             "A list of recipe types which may only be looked up on the main thread. Add a recipe type to this list if errors start happening.");
         for (String s : stLookups) {
             try {
-                singleThreadedLookups.add(ForgeRegistries.RECIPE_TYPES.getValue(new ResourceLocation(s)));
+                singleThreadedLookups.add(BuiltInRegistries.RECIPE_TYPE.get(ResourceLocation.parse(s)));
             }
             catch (Exception ex) {
                 LOGGER.error("Invalid single threaded recipe type name {} will be ignored.", s);
@@ -96,8 +97,8 @@ public class FastSuite {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test(ServerStartedEvent e) {
         LOGGER.info("FastSuite Debug Recipe Counts:");
-        for (RecipeType type : ForgeRegistries.RECIPE_TYPES.getValues()) {
-            LOGGER.info("{}: {}", ForgeRegistries.RECIPE_TYPES.getKey(type), e.getServer().getRecipeManager().getAllRecipesFor(type).size());
+        for (RecipeType type : BuiltInRegistries.RECIPE_TYPE) {
+            LOGGER.info("{}: {}", BuiltInRegistries.RECIPE_TYPE.getKey(type), e.getServer().getRecipeManager().getAllRecipesFor(type).size());
         }
 
         LOGGER.info("Initiating FastSuite Tests...");
@@ -133,12 +134,12 @@ public class FastSuite {
         String[] names = { "acacia planks", "sticks", "crafting table", "black shulker box", "failed match" };
 
         for (int testCase = 0; testCase < names.length; testCase++) {
-            this.testMulti(mgr, world, arr[testCase], names[testCase]);
-            this.testSingle(mgr, world, arr[testCase], names[testCase]);
+            this.testMulti(mgr, world, arr[testCase].asCraftInput(), names[testCase]);
+            this.testSingle(mgr, world, arr[testCase].asCraftInput(), names[testCase]);
         }
     }
 
-    private void testMulti(AuxRecipeManager mgr, Level level, CraftingContainer input, String recipeName) {
+    private void testMulti(AuxRecipeManager mgr, Level level, CraftingInput input, String recipeName) {
         long time, time2;
         long deltaSum = 0;
         int iterations = 10000;
@@ -151,7 +152,7 @@ public class FastSuite {
         LOGGER.info("[Multithreaded Test] - Took an average of {} ns to find the recipe for {}", deltaSum / (float) iterations, recipeName);
     }
 
-    private void testSingle(AuxRecipeManager mgr, Level level, CraftingContainer input, String recipeName) {
+    private void testSingle(AuxRecipeManager mgr, Level level, CraftingInput input, String recipeName) {
         long time, time2;
         long deltaSum = 0;
         int iterations = 10000;
