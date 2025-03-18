@@ -1,3 +1,9 @@
+## 5.1.0
+* FastSuite will now only parallelize recipes that are known to be thread-safe.
+  * By default, this includes all vanilla recipe classes that use all vanilla or forge ingredients.
+  * Additional modded recipe classes and ingredients can be added by calling the static methods on `FastSuite`.
+  * In large modpacks, more than 90% of crafting recipes are covered by the default thread-safe classifiers.
+
 ## 5.0.1
 * Removed forge dependency line from the mods.toml and marked as Forge and NeoForge for CF.
   * The dependency will be added back and the Forge marker will be removed once CF supports Neo correctly.
