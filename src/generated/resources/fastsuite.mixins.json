@@ -1,0 +1,16 @@
+{
+    "required": true,
+    "package": "dev.shadowsoffire.fastsuite.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "refmap": "fastsuite.refmap.json",
+    "maxShiftBy": 5,
+    "mixins": [
+        "ItemStackMixin",
+        "ServerResourcesMixin"
+    ],
+    "client": [
+        "client.ClientPacketListenerMixin"
+    ],
+    "minVersion": "0.8",
+    "maxShiftBy": 5
+}
