@@ -35,6 +35,7 @@ public class FastSuite {
     public static int maxRecipeLookupTime = 25;
     public static Set<RecipeType<?>> singleThreadedLookups = new HashSet<>();
     public static boolean lockInputStacks = false;
+    public static boolean unsafeMode = false;
 
     public FastSuite() {
         StreamUtils.setup(this);
@@ -61,8 +62,17 @@ public class FastSuite {
 
         maxRecipeLookupTime = cfg.getInt("Max Recipe Lookup Time", "general", maxRecipeLookupTime, 1, 300, "The max time, in seconds, that a recipe lookup may take before aborting the lookup and logging an error.");
         lockInputStacks = cfg.getBoolean("Lock Crafting Input Stacks", "general", false, "If true, the stacks used as recipe inputs will be locked and throw an error if modified during parallel matching. Useful for debugging.");
+        unsafeMode = cfg.getBoolean("Unsafe Mode", "general", false, "If true, FastSuite parallelize all recipes without validation. This can cause crashes if a recipe is not thread safe.");
 
         if (cfg.hasChanged()) cfg.save();
+    }
+
+    public static void registerSafeRecipeClass(Class<?> clazz) {
+        CachedRecipeList.parallelRecipeClassCache.put(clazz, true);
+    }
+
+    public static void registerSafeIngredientClass(Class<?> clazz) {
+        CachedRecipeList.ingredientClassCache.put(clazz, true);
     }
 
     private static class TestMenu extends AbstractContainerMenu {
