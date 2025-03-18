@@ -1,3 +1,6 @@
+## 6.0.0
+* Updated to 1.21.1. This version also contains the thread-safe recipe matching improvements from 5.1.0.
+
 ## 5.1.0
 * FastSuite will now only parallelize recipes that are known to be thread-safe.
   * By default, this includes all vanilla recipe classes that use all vanilla or forge ingredients.
