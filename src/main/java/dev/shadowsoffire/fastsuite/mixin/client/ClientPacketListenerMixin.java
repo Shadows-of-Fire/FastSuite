@@ -15,7 +15,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.Connection;
 import net.minecraft.world.item.crafting.RecipeManager;
 
-@Mixin(ClientPacketListener.class)
+@Mixin(value = ClientPacketListener.class, remap = false)
 public class ClientPacketListenerMixin {
 
     @Shadow

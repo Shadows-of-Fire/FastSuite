@@ -92,7 +92,7 @@ class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
             return recipe.value().matches(inv, level);
         };
 
-        List<RecipeHolder<T>> parallelList = StreamUtils.executeUntil(() -> this.parallelRecipes
+        List<RecipeHolder<T>> parallelList = StreamUtils.<List<RecipeHolder<T>>>executeUntil(() -> this.parallelRecipes
             .parallelStream()
             .filter(recipeFilter)
             .collect(Collectors.toCollection(ArrayList::new)),

@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import dev.shadowsoffire.fastsuite.ILockableItemStack;
 import net.minecraft.world.item.ItemStack;
 
-@Mixin(ItemStack.class)
+@Mixin(value = ItemStack.class, remap = false)
 public class ItemStackMixin implements ILockableItemStack {
 
 	private boolean locked;
