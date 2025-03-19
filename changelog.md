@@ -1,3 +1,6 @@
+## 6.0.2
+* Fixed the debug test being enabled, which would cause world start times to increase substantially.
+
 ## 6.0.1
 * Fixed a conflict with KubeJS that caused the game to crash on startup.
 
