@@ -1,3 +1,6 @@
+## 6.0.1
+* Fixed a conflict with KubeJS that caused the game to crash on startup.
+
 ## 6.0.0
 * Updated to 1.21.1. This version also contains the thread-safe recipe matching improvements from 5.1.0.
 
