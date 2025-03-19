@@ -30,7 +30,7 @@ public class FastSuite {
 
     public static final String MODID = "fastsuite";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
-    public static boolean DEBUG = true;
+    public static boolean DEBUG = false;
     public static final int MIN_SIZE_REQUIRED_FOR_THREADING = 100;
 
     public static int maxRecipeLookupTime = 25;
