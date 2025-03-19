@@ -14,7 +14,7 @@ import net.minecraft.server.ReloadableServerResources;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.crafting.RecipeManager;
 
-@Mixin(value = ReloadableServerResources.class, remap = false)
+@Mixin(value = ReloadableServerResources.class, remap = false, priority = 500)
 public class ServerResourcesMixin {
 
     @Shadow
