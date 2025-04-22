@@ -32,6 +32,7 @@ public class FastSuite {
     public static final Logger LOGGER = LogManager.getLogger(MODID);
     public static boolean DEBUG = false;
     public static final int MIN_SIZE_REQUIRED_FOR_THREADING = 100;
+    public static final boolean DEBUG_MATCHING = "on".equalsIgnoreCase(System.getenv("FASTSUITE_DEBUG_MATCHING"));
 
     public static int maxRecipeLookupTime = 25;
     public static Set<RecipeType<?>> singleThreadedLookups = new HashSet<>();

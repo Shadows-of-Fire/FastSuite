@@ -9,6 +9,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.core.HolderLookup;
@@ -45,9 +47,17 @@ public class AuxRecipeManager extends RecipeManager {
         }
     }
 
+    /**
+     * We need to specifically override this method (the one with the RecipeHolder param) since it is the "general" case. The other methods delegate to this one.
+     */
     @Override
-    public <C extends RecipeInput, T extends Recipe<C>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, C inv, Level level) {
+    public <C extends RecipeInput, T extends Recipe<C>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, C inv, Level level, @Nullable RecipeHolder<T> lastRecipe) {
         if (this.numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) return super.getRecipeFor(type, inv, level);
+
+        if (lastRecipe != null && lastRecipe.value().matches(inv, level)) {
+            return Optional.of(lastRecipe);
+        }
+
         this.lockAllStacks(inv, true);
         try {
             if (FastSuite.unsafeMode) {
@@ -57,7 +67,11 @@ public class AuxRecipeManager extends RecipeManager {
             }
             else {
                 var cachedRecipeList = getCachedRecipeList(type);
-                return cachedRecipeList.getRecipeFor(inv, level);
+                var out = cachedRecipeList.getRecipeFor(inv, level);
+                if (FastSuite.DEBUG_MATCHING) {
+                    FastSuite.LOGGER.info("Matched recipe: " + out + " for input " + inv);
+                }
+                return out;
             }
         }
         catch (Exception ex) {

@@ -5,6 +5,7 @@
     "refmap": "fastsuite.refmap.json",
     "maxShiftBy": 5,
     "mixins": [
+        "CraftingInputMixin",
         "ItemStackMixin",
         "ServerResourcesMixin"
     ],
