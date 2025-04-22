@@ -1,3 +1,6 @@
+## 6.0.3
+* Fixed a race condition that occurs when multiple shapeless recipes match concurrently.
+
 ## 6.0.2
 * Fixed the debug test being enabled, which would cause world start times to increase substantially.
 
