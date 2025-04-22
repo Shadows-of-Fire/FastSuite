@@ -12,7 +12,7 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
 
-@Mixin(CraftingInput.class)
+@Mixin(value = CraftingInput.class, remap = false)
 public abstract class CraftingInputMixin implements RecipeInput {
 
     @Shadow
