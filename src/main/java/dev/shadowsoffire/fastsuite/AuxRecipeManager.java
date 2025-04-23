@@ -52,7 +52,9 @@ public class AuxRecipeManager extends RecipeManager {
      */
     @Override
     public <C extends RecipeInput, T extends Recipe<C>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, C inv, Level level, @Nullable RecipeHolder<T> lastRecipe) {
-        if (this.numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) return super.getRecipeFor(type, inv, level);
+        if (this.numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) {
+            return super.getRecipeFor(type, inv, level, lastRecipe);
+        }
 
         if (lastRecipe != null && lastRecipe.value().matches(inv, level)) {
             return Optional.of(lastRecipe);
