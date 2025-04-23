@@ -36,19 +36,17 @@ public class AuxRecipeManager extends RecipeManager {
         return super.getRecipeFor(type, inv, level);
     }
 
-    private <C extends RecipeInput, T extends Recipe<C>> CachedRecipeList<C, T> getCachedRecipeList(RecipeType<T> type) {
-        synchronized (cachedRecipeListMap) {
-            CachedRecipeList<C, T> list = (CachedRecipeList<C, T>) cachedRecipeListMap.get(type);
-            if (list == null) {
-                list = new CachedRecipeList<>(type, this.byType(type));
-                cachedRecipeListMap.put(type, list);
-            }
-            return list;
-        }
-    }
-
     /**
-     * We need to specifically override this method (the one with the RecipeHolder param) since it is the "general" case. The other methods delegate to this one.
+     * Returns the first recipe for the given recipe type, recipe input, and level.
+     * <p>
+     * This method will concurrently match recipes if the number of recipes is above the threshold set in {@link FastSuite#MIN_SIZE_REQUIRED_FOR_THREADING} and the
+     * type is not blacklisted.
+     * <p>
+     * If {@link FastSuite#unsafeMode}, all recipes will be matched in parallel; otherwise, only the known-safe recipes will be matched in parallel.
+     *
+     * @apiNote The output of this method is not necessarily stable if there are recipe conflicts. Recipe conflicts are undefined behavior.
+     * @implNote We need to specifically override this method (the one with the RecipeHolder param) since it is the "general" case. The other methods delegate to
+     *           this one.
      */
     @Override
     public <C extends RecipeInput, T extends Recipe<C>> Optional<RecipeHolder<T>> getRecipeFor(RecipeType<T> type, C inv, Level level, @Nullable RecipeHolder<T> lastRecipe) {
@@ -84,9 +82,20 @@ public class AuxRecipeManager extends RecipeManager {
         }
     }
 
+    /**
+     * Returns all recipes for the given recipe type, recipe input, and level.
+     * <p>
+     * This method will concurrently match recipes if the number of recipes is above the threshold
+     * set by {@link FastSuite#MIN_SIZE_REQUIRED_FOR_THREADING} and the type is not blacklisted.
+     * <p>
+     * If {@link FastSuite#unsafeMode}, all recipes will be matched in parallel; otherwise, only the known-safe recipes will be matched in parallel.
+     */
     @Override
     public <C extends RecipeInput, T extends Recipe<C>> List<RecipeHolder<T>> getRecipesFor(RecipeType<T> type, C inv, Level level) {
-        if (this.numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) return super.getRecipesFor(type, inv, level);
+        if (this.numRecipesOf(type) < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) {
+            return super.getRecipesFor(type, inv, level);
+        }
+
         this.lockAllStacks(inv, true);
         try {
             if (FastSuite.unsafeMode) {
@@ -109,12 +118,33 @@ public class AuxRecipeManager extends RecipeManager {
         }
     }
 
+    /**
+     * Returns the cached recipe list for the given recipe type, creating it if it doesn't exist.
+     */
+    private <C extends RecipeInput, T extends Recipe<C>> CachedRecipeList<C, T> getCachedRecipeList(RecipeType<T> type) {
+        synchronized (cachedRecipeListMap) {
+            CachedRecipeList<C, T> list = (CachedRecipeList<C, T>) cachedRecipeListMap.get(type);
+            if (list == null) {
+                list = new CachedRecipeList<>(type, this.byType(type));
+                cachedRecipeListMap.put(type, list);
+            }
+            return list;
+        }
+    }
+
+    /**
+     * If {@link FastSuite#lockInputStacks} is enabled, modifies the locked state of all stacks in the given recipe input.
+     * 
+     * @param inv    The recipe input to modify the stacks of.
+     * @param locked Whether to lock or unlock the stacks.
+     */
     private <C extends RecipeInput> void lockAllStacks(C inv, boolean locked) {
-        if (!FastSuite.lockInputStacks) return;
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack s = inv.getItem(i);
-            if (!s.isEmpty()) {
-                ((ILockableItemStack) (Object) s).setLocked(locked);
+        if (FastSuite.lockInputStacks) {
+            for (int i = 0; i < inv.size(); i++) {
+                ItemStack s = inv.getItem(i);
+                if (!s.isEmpty()) {
+                    ((ILockableItemStack) (Object) s).setLocked(locked);
+                }
             }
         }
     }
