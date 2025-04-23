@@ -1,3 +1,6 @@
+## 6.0.4
+* Fixed a Stack Overflow caused by calling the incorrect super method in `getRecipeFor`.
+
 ## 6.0.3
 * Fixed a race condition that occurs when multiple shapeless recipes match concurrently.
 
