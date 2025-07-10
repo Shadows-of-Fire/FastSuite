@@ -29,13 +29,13 @@ config="fastsuite.mixins.json"
 [[dependencies.fastsuite]]
     modId="neoforge"
     type="required"
-    versionRange="[21.1.61,)"
+    versionRange="[21.1.187,)"
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.fastsuite]]
     modId="placebo"
     type="required"
-    versionRange="[9.7.0,)"
+    versionRange="[9.9.0,)"
     ordering="AFTER"
     side="BOTH"
