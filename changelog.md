@@ -1,3 +1,6 @@
+## 6.0.5
+* Updated to Placebo 9.9.0.
+
 ## 6.0.4
 * Fixed a Stack Overflow caused by calling the incorrect super method in `getRecipeFor`.
 
