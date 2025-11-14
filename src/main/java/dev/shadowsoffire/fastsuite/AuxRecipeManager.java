@@ -67,11 +67,16 @@ public class AuxRecipeManager extends RecipeManager {
             }
             else {
                 var cachedRecipeList = getCachedRecipeList(type);
-                var out = cachedRecipeList.getRecipeFor(inv, level);
-                if (FastSuite.DEBUG_MATCHING) {
-                    FastSuite.LOGGER.info("Matched recipe: " + out + " for input " + inv);
+                try {
+                	var out = cachedRecipeList.getRecipeFor(inv, level);
+                	if (FastSuite.DEBUG_MATCHING) {
+                    	FastSuite.LOGGER.info("Matched recipe: " + out + " for input " + inv);
+                	}
+                	return out;
+                } catch(Exception ex){
+                	FastSuite.LOGGER.error("Invalid recipeFor for input " + inv);
+                	return null;
                 }
-                return out;
             }
         }
         catch (Exception ex) {
