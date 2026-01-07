@@ -1,3 +1,6 @@
+## 6.0.6
+* Fixed an issue where Ingredient#stackingIds could be the casualty of a data race and crash the game.
+
 ## 6.0.5
 * Updated to Placebo 9.9.0.
 
