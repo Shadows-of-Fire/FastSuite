@@ -1,3 +1,6 @@
+## 5.1.1
+* Fixed a rare issue that could happen if `Ingredient#stackingIds` was initialized by two threads concurrently.
+
 ## 5.1.0
 * FastSuite will now only parallelize recipes that are known to be thread-safe.
   * By default, this includes all vanilla recipe classes that use all vanilla or forge ingredients.
