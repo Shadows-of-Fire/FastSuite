@@ -44,11 +44,12 @@ public abstract class CraftingInputMixin implements RecipeInput {
     }
 
     /**
-     * StackedContents is NOT thread-safe, so we have to force {@link CraftingInput} to
-     * always return a new one since {@link ShapelessRecipe} accesses it during {@link ShapelessRecipe#matches}.
-     * <p>
-     * Failure to do so will result in random matching failures, which causes all kinds of random side effects.
-     * https://github.com/Shadows-of-Fire/FastSuite/issues/44
+     * @reason StackedContents is NOT thread-safe, so we have to force {@link CraftingInput} to
+     *         always return a new one since {@link ShapelessRecipe} accesses it during {@link ShapelessRecipe#matches}.
+     *         <p>
+     *         Failure to do so will result in random matching failures, which causes all kinds of random side effects.
+     *         https://github.com/Shadows-of-Fire/FastSuite/issues/44
+     * @author Shadows_of_Fire
      */
     @Overwrite
     public StackedContents stackedContents() {

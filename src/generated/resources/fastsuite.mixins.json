@@ -6,6 +6,7 @@
     "maxShiftBy": 5,
     "mixins": [
         "CraftingInputMixin",
+        "IngredientMixin",
         "ItemStackMixin",
         "ServerResourcesMixin"
     ],
