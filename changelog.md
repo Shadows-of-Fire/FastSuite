@@ -1,3 +1,6 @@
+## 5.1.2
+* Fixed a severe performance issue that can occur with FastSuite+ModernFix+AE2JEIIntegration.
+
 ## 5.1.1
 * Fixed a rare issue that could happen if `Ingredient#stackingIds` was initialized by two threads concurrently.
 
