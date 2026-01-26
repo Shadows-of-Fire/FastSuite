@@ -27,7 +27,9 @@ public abstract class IngredientMixin {
     @Overwrite
     @SuppressWarnings("unused")
     public IntList getStackingIds() {
-        Object ignored = this.getItems(); // Need to call this to make ModernFix's mixin happy otherwise the world explodes
+        if (this.stackingIds == null) {
+            Object ignored = this.getItems(); // Need to call this to make ModernFix's mixin happy otherwise the world explodes
+        }
         return this.__getStackingIds();
     }
 
