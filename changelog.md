@@ -1,3 +1,6 @@
+## 6.0.7
+* Fixed a severe performance issue that can occur with FastSuite+ModernFix+AE2JEIIntegration.
+
 ## 6.0.6
 * Fixed an issue where Ingredient#stackingIds could be the casualty of a data race and crash the game.
 
