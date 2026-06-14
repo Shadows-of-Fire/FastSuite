@@ -8,7 +8,7 @@ import org.apache.logging.log4j.Logger;
 
 import dev.shadowsoffire.placebo.config.Configuration;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.CraftingContainer;
@@ -16,6 +16,8 @@ import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeMap;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.IEventBus;
@@ -37,7 +39,6 @@ public class FastSuite {
     public static int maxRecipeLookupTime = 25;
     public static Set<RecipeType<?>> singleThreadedLookups = new HashSet<>();
     public static boolean lockInputStacks = false;
-    public static boolean unsafeMode = false;
 
     public FastSuite(IEventBus bus) {
         StreamUtils.setup(this);
@@ -55,7 +56,7 @@ public class FastSuite {
             "A list of recipe types which may only be looked up on the main thread. Add a recipe type to this list if errors start happening.");
         for (String s : stLookups) {
             try {
-                singleThreadedLookups.add(BuiltInRegistries.RECIPE_TYPE.get(ResourceLocation.parse(s)));
+                singleThreadedLookups.add(BuiltInRegistries.RECIPE_TYPE.getValue(Identifier.parse(s)));
             }
             catch (Exception ex) {
                 LOGGER.error("Invalid single threaded recipe type name {} will be ignored.", s);
@@ -64,7 +65,6 @@ public class FastSuite {
 
         maxRecipeLookupTime = cfg.getInt("Max Recipe Lookup Time", "general", maxRecipeLookupTime, 1, 300, "The max time, in seconds, that a recipe lookup may take before aborting the lookup and logging an error.");
         lockInputStacks = cfg.getBoolean("Lock Crafting Input Stacks", "general", false, "If true, the stacks used as recipe inputs will be locked and throw an error if modified during parallel matching. Useful for debugging.");
-        unsafeMode = cfg.getBoolean("Unsafe Mode", "general", false, "If true, FastSuite parallelize all recipes without validation. This can cause crashes if a recipe is not thread safe.");
 
         if (cfg.hasChanged()) cfg.save();
     }
@@ -99,11 +99,11 @@ public class FastSuite {
     public void test(ServerStartedEvent e) {
         LOGGER.info("FastSuite Debug Recipe Counts:");
         for (RecipeType type : BuiltInRegistries.RECIPE_TYPE) {
-            LOGGER.info("{}: {}", BuiltInRegistries.RECIPE_TYPE.getKey(type), e.getServer().getRecipeManager().getAllRecipesFor(type).size());
+            LOGGER.info("{}: {}", BuiltInRegistries.RECIPE_TYPE.getKey(type), e.getServer().getRecipeManager().recipeMap().byType(type).size());
         }
 
         LOGGER.info("Initiating FastSuite Tests...");
-        AuxRecipeManager mgr = (AuxRecipeManager) e.getServer().getRecipeManager();
+        RecipeManager mgr = e.getServer().getRecipeManager();
         CraftingContainer inv = new TransientCraftingContainer(new TestMenu(), 2, 2);
         Level world = e.getServer().getLevel(Level.OVERWORLD);
         inv.setItem(0, new ItemStack(Items.ACACIA_LOG));
@@ -140,26 +140,28 @@ public class FastSuite {
         }
     }
 
-    private void testMulti(AuxRecipeManager mgr, Level level, CraftingInput input, String recipeName) {
+    private void testMulti(RecipeManager mgr, Level level, CraftingInput input, String recipeName) {
         long time, time2;
         long deltaSum = 0;
         int iterations = 10000;
+        RecipeMap map = mgr.recipeMap();
         for (int i = 0; i < iterations; i++) {
             time = System.nanoTime();
-            mgr.getRecipeFor(RecipeType.CRAFTING, input, level);
+            map.getRecipesFor(RecipeType.CRAFTING, input, level).findFirst();
             time2 = System.nanoTime();
             deltaSum += time2 - time;
         }
         LOGGER.info("[Multithreaded Test] - Took an average of {} ns to find the recipe for {}", deltaSum / (float) iterations, recipeName);
     }
 
-    private void testSingle(AuxRecipeManager mgr, Level level, CraftingInput input, String recipeName) {
+    private void testSingle(RecipeManager mgr, Level level, CraftingInput input, String recipeName) {
         long time, time2;
         long deltaSum = 0;
         int iterations = 10000;
+        TestableRecipeMap map = (TestableRecipeMap) mgr.recipeMap();
         for (int i = 0; i < iterations; i++) {
             time = System.nanoTime();
-            mgr.super_getRecipeFor(RecipeType.CRAFTING, input, level);
+            map.super_getRecipesFor(RecipeType.CRAFTING, input, level).findFirst();
             time2 = System.nanoTime();
             deltaSum += time2 - time;
         }

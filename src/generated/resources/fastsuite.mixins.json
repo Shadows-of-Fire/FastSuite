@@ -1,17 +1,16 @@
 {
     "required": true,
     "package": "dev.shadowsoffire.fastsuite.mixin",
-    "compatibilityLevel": "JAVA_21",
+    "compatibilityLevel": "JAVA_25",
     "refmap": "fastsuite.refmap.json",
     "maxShiftBy": 5,
     "mixins": [
         "CraftingInputMixin",
-        "IngredientMixin",
         "ItemStackMixin",
-        "ServerResourcesMixin"
+        "RecipeMapMixin"
     ],
     "client": [
-        "client.ClientPacketListenerMixin"
+
     ],
     "minVersion": "0.8",
     "maxShiftBy": 5

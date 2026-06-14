@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.80'
+    id 'net.neoforged.moddev' version '2.0.141'
     id 'com.diffplug.eclipse.apt' version '3.42.2'
     id 'net.darkhax.curseforgegradle' version '1.1.18'
 }
@@ -17,12 +17,6 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 
 neoForge {
     version = project.properties.forgeVersion
-
-    parchment {
-        def split = "${parchmentVersion}".split('-')
-        minecraftVersion = split[1]
-        mappingsVersion = split[0]
-    }
 
     mods {
         create(project.name) {
@@ -50,18 +44,13 @@ neoForge {
         }
 
         data {
-            data()
+            clientData()
             programArguments.addAll '--mod', "${modid}", '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
             ideName = "${project.name} - Data"
         }
     }
 
     ideSyncTask generateModMetadata
-
-    neoFormRuntime {
-        useEclipseCompiler = false // Allows for parallelism on recompile - disabled due to a bug.
-        version = "1.0.21"
-    }
 }
 
 repositories {
@@ -320,17 +309,14 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 def getChangelogLink() {
-    def repo = ''
-    def proc = 'git config --get remote.origin.url'.execute();
-    proc.in.eachLine { line -> repo = line}
-    proc.err.eachLine { line -> println line }
-    proc.waitFor();
+    def repo = providers.exec {
+        commandLine 'git', 'config', '--get', 'remote.origin.url'
+    }.standardOutput.asText.get().trim()
 
-    def branch = ''
-    proc = 'git rev-parse --abbrev-ref HEAD'.execute()
-    proc.in.eachLine { line -> branch = line }
-    proc.err.eachLine { line -> println line }
-    proc.waitFor()
+    def branch = providers.exec {
+        commandLine 'git', 'rev-parse', '--abbrev-ref', 'HEAD'
+    }.standardOutput.asText.get().trim()
+
     // Remove ".git" and append /blob/branch/changelog.md
     if (!repo.isBlank() && !branch.isBlank()) {
         return repo.substring(0, repo.length() - 4) + '/blob/' + branch + '/changelog.md'

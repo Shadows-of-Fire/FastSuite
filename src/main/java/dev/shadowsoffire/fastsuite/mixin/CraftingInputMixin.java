@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-import net.minecraft.world.entity.player.StackedContents;
+import net.minecraft.world.entity.player.StackedItemContents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeInput;
@@ -44,7 +44,7 @@ public abstract class CraftingInputMixin implements RecipeInput {
     }
 
     /**
-     * @reason StackedContents is NOT thread-safe, so we have to force {@link CraftingInput} to
+     * @reason StackedItemContents is NOT thread-safe, so we have to force {@link CraftingInput} to
      *         always return a new one since {@link ShapelessRecipe} accesses it during {@link ShapelessRecipe#matches}.
      *         <p>
      *         Failure to do so will result in random matching failures, which causes all kinds of random side effects.
@@ -52,8 +52,8 @@ public abstract class CraftingInputMixin implements RecipeInput {
      * @author Shadows_of_Fire
      */
     @Overwrite
-    public StackedContents stackedContents() {
-        StackedContents contents = new StackedContents();
+    public StackedItemContents stackedContents() {
+        StackedItemContents contents = new StackedItemContents();
         for (ItemStack itemstack : items) {
             if (!itemstack.isEmpty()) {
                 contents.accountStack(itemstack, 1);

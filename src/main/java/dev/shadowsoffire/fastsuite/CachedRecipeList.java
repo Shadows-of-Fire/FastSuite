@@ -7,14 +7,18 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.spongepowered.asm.mixin.Unique;
+
 import com.google.common.base.Stopwatch;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -28,11 +32,14 @@ import net.minecraft.world.level.Level;
  * A recipe is parallelizable if the recipe class and all ingredients are known to be thread-safe. All vanilla recipes are considered thread-safe.
  */
 @SuppressWarnings("deprecation")
-class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
+public class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
 
     static final Map<Class<?>, Boolean> parallelRecipeClassCache = Collections.synchronizedMap(new IdentityHashMap<>());
     static final Map<Class<?>, Boolean> ingredientClassCache = Collections.synchronizedMap(new IdentityHashMap<>());
 
+    // Neo implements recipe priorities at the RecipeManager level, but we don't have that context here.
+    // The effective priorities are the iteration order, so we need to compute that and preserve it to re-order after matching.
+    private final Object2IntMap<RecipeHolder<T>> effectivePriorities = new Object2IntOpenHashMap<>();
     private final List<RecipeHolder<T>> serialRecipes;
     private final List<RecipeHolder<T>> parallelRecipes;
     private final RecipeType<T> type;
@@ -43,10 +50,14 @@ class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
         this.parallelRecipes = new ArrayList<>();
         Stopwatch watch = Stopwatch.createStarted();
         for (RecipeHolder<T> holder : recipes) {
-            if (isParallelRecipe(holder.value()))
+            if (isParallelRecipe(holder.value())) {
                 this.parallelRecipes.add(holder);
-            else
+            }
+            else {
                 this.serialRecipes.add(holder);
+            }
+
+            this.effectivePriorities.put(holder, recipes.size() - this.effectivePriorities.size());
         }
         watch.stop();
         FastSuite.LOGGER.info("Constructed recipe list for {} in {}. {}/{} recipes are parallelized.",
@@ -54,53 +65,34 @@ class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
     }
 
     /**
-     * Attempts to match a recipe for the given container and level. This method first checks parallel recipes, then serial recipes.
-     * 
-     * @implNote This method will need to be updated if/when Forge implements recipe priority.
-     */
-    public Optional<RecipeHolder<T>> getRecipeFor(C inv, Level level) {
-        Optional<RecipeHolder<T>> parRecipe = StreamUtils.executeUntil(() -> this.parallelRecipes.parallelStream()
-            .filter(recipe -> recipe.value().matches(inv, level))
-            .findFirst(),
-            FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Optional.empty(), () -> timeoutMsg(type));
-
-        if (parRecipe.isPresent()) {
-            return parRecipe;
-        }
-
-        // check serial recipes
-        for (RecipeHolder<T> recipe : this.serialRecipes) {
-            if (recipe.value().matches(inv, level)) {
-                return Optional.of(recipe);
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Matches all recipes for the given container and level.
-     * <p>
-     * In accordance with the contract of {@link RecipeType#getRecipesFor}, the returned list is sorted by the description ID of the result item.
+     * Matches all recipes for the given input and level. Recipes deemed "safe" are matched in parallel, and then recipes deemed "unsafe" are matched serially
+     * afterwards.
      */
     public List<RecipeHolder<T>> getRecipesFor(C inv, Level level) {
-        Comparator<RecipeHolder<T>> recipeSorter = Comparator.comparing((recipe) -> {
-            return recipe.value().getResultItem(level.registryAccess()).getDescriptionId();
-        });
-
         Predicate<RecipeHolder<T>> recipeFilter = (recipe) -> {
             return recipe.value().matches(inv, level);
         };
 
-        List<RecipeHolder<T>> parallelList = StreamUtils.<List<RecipeHolder<T>>>executeUntil(() -> this.parallelRecipes
-            .parallelStream()
-            .filter(recipeFilter)
-            .collect(Collectors.toCollection(ArrayList::new)),
-            FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Collections.emptyList(), () -> timeoutMsg(type));
+        try {
+            this.lockAllStacks(inv, true);
+            List<RecipeHolder<T>> matches = StreamUtils.<List<RecipeHolder<T>>>executeUntil(() -> this.parallelRecipes
+                .parallelStream()
+                .filter(recipeFilter)
+                .collect(Collectors.toCollection(ArrayList::new)),
+                FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Collections.emptyList(), () -> timeoutMsg(type));
 
-        parallelList.addAll(this.serialRecipes.stream().filter(recipeFilter).toList());
-        Collections.sort(parallelList, recipeSorter);
-        return parallelList;
+            matches.addAll(this.serialRecipes.stream().filter(recipeFilter).toList());
+
+            matches.sort(Comparator.comparingInt(this.effectivePriorities));
+
+            return matches;
+        }
+        catch (Exception ex) {
+            throw ex;
+        }
+        finally {
+            this.lockAllStacks(inv, false);
+        }
     }
 
     /**
@@ -113,7 +105,7 @@ class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
             return false;
         }
 
-        for (Ingredient ingredient : recipe.getIngredients()) {
+        for (Ingredient ingredient : recipe.placementInfo().ingredients()) {
             if (!isSafeIngredient(ingredient))
                 return false;
         }
@@ -141,5 +133,23 @@ class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
     static String timeoutMsg(RecipeType<?> type) {
         return String.format("Multithreaded recipe lookup took longer than %d seconds - aborting and returning nothing. Consider blacklisting this recipe type (%s) in the config.", FastSuite.maxRecipeLookupTime,
             BuiltInRegistries.RECIPE_TYPE.getKey(type));
+    }
+
+    /**
+     * If {@link FastSuite#lockInputStacks} is enabled, modifies the locked state of all stacks in the given recipe input.
+     *
+     * @param inv    The recipe input to modify the stacks of.
+     * @param locked Whether to lock or unlock the stacks.
+     */
+    @Unique
+    private void lockAllStacks(C inv, boolean locked) {
+        if (FastSuite.lockInputStacks) {
+            for (int i = 0; i < inv.size(); i++) {
+                ItemStack s = inv.getItem(i);
+                if (!s.isEmpty()) {
+                    ((ILockableItemStack) (Object) s).setLocked(locked);
+                }
+            }
+        }
     }
 }
