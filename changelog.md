@@ -1,3 +1,8 @@
+## 7.0.0
+* Ported to Minecraft 26.1.2.
+* FastSuite no longer uses a concurrent matching scheme, and instead uses an index-based scheme.
+  * This means no weird concurrency bugs, and actually ends up with better performance overall.
+
 ## 6.0.7
 * Fixed a severe performance issue that can occur with FastSuite+ModernFix+AE2JEIIntegration.
 
