@@ -24,7 +24,7 @@ public class FastSuite {
     public static boolean ENABLE_SERVER_START_TESTS = false;
     public static final boolean DEBUG_MATCHING = "on".equalsIgnoreCase(System.getenv("FASTSUITE_DEBUG_MATCHING"));
 
-    public static Set<RecipeType<?>> singleThreadedLookups = new HashSet<>();
+    public static Set<RecipeType<?>> indexedTypes = new HashSet<>();
 
     public FastSuite(IEventBus bus) {
         bus.register(this);
@@ -37,14 +37,20 @@ public class FastSuite {
     public void setup(FMLCommonSetupEvent e) {
         Configuration cfg = new Configuration(MODID);
         cfg.setTitle("FastSuite Configuration");
-        String[] stLookups = cfg.getStringList("Single Threaded Recipe Types", "general", new String[0],
-            "A list of recipe types which may only be looked up on the main thread. Add a recipe type to this list if errors start happening.");
-        for (String s : stLookups) {
+        String[] types = cfg.getStringList("Indexed Recipe Types", "general", new String[] { "minecraft:crafting", "minecraft:smelting", "minecraft:blasting", "minecraft:smoking" },
+            "A whitelist of recipe types that FastSuite will index and accelerate. Add a recipe type here (e.g. minecraft:smelting) to optimize its lookups.");
+        for (String s : types) {
             try {
-                singleThreadedLookups.add(BuiltInRegistries.RECIPE_TYPE.getValue(Identifier.parse(s)));
+                RecipeType<?> type = BuiltInRegistries.RECIPE_TYPE.getValue(Identifier.parse(s));
+                if (type != null) {
+                    indexedTypes.add(type);
+                }
+                else {
+                    LOGGER.error("Unknown recipe type {} in the Indexed Recipe Types config will be ignored.", s);
+                }
             }
             catch (Exception ex) {
-                LOGGER.error("Invalid single threaded recipe type name {} will be ignored.", s);
+                LOGGER.error("Invalid recipe type name {} in the Indexed Recipe Types config will be ignored.", s);
             }
         }
 

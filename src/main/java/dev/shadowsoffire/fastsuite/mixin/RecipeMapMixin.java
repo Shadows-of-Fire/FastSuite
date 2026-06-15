@@ -24,8 +24,8 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
 /**
- * Replaces {@link RecipeMap#getRecipesFor(RecipeType, RecipeInput, Level)} for crafting with an indexed variant (see {@link CachedRecipeList}). All other
- * recipe types fall through to vanilla.
+ * Replaces {@link RecipeMap#getRecipesFor(RecipeType, RecipeInput, Level)} with an indexed variant (see {@link CachedRecipeList}) for the recipe types
+ * whitelisted in {@link FastSuite#indexedTypes} (crafting by default). All other recipe types fall through to vanilla.
  */
 @Mixin(value = RecipeMap.class, remap = false)
 public abstract class RecipeMapMixin implements TestableRecipeMap {
@@ -35,8 +35,8 @@ public abstract class RecipeMapMixin implements TestableRecipeMap {
 
     @Inject(method = "getRecipesFor", at = @At("HEAD"), cancellable = true)
     private <I extends RecipeInput, T extends Recipe<I>> void fastsuite$indexedGetRecipesFor(RecipeType<T> type, I container, Level level, CallbackInfoReturnable<Stream<RecipeHolder<T>>> cir) {
-        if (type != RecipeType.CRAFTING || container.isEmpty() || FastSuite.singleThreadedLookups.contains(type)) {
-            return; // only crafting is indexed; everything else (and empty inputs) falls through to vanilla
+        if (!FastSuite.indexedTypes.contains(type) || container.isEmpty()) {
+            return; // only whitelisted recipe types are indexed; everything else (and empty inputs) falls through to vanilla
         }
 
         CachedRecipeList<I, T> cached = this.getCachedList(type);
