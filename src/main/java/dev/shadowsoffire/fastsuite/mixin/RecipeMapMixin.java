@@ -24,7 +24,8 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
 /**
- * Replaces {@link RecipeMap#getRecipesFor(RecipeType, RecipeInput, Level)} with a parallel variant.
+ * Replaces {@link RecipeMap#getRecipesFor(RecipeType, RecipeInput, Level)} for crafting with an indexed variant (see {@link CachedRecipeList}). All other
+ * recipe types fall through to vanilla.
  */
 @Mixin(value = RecipeMap.class, remap = false)
 public abstract class RecipeMapMixin implements TestableRecipeMap {
@@ -33,18 +34,13 @@ public abstract class RecipeMapMixin implements TestableRecipeMap {
     private Map<RecipeType<?>, CachedRecipeList<?, ?>> fastsuite$cache = Collections.synchronizedMap(new HashMap<>());
 
     @Inject(method = "getRecipesFor", at = @At("HEAD"), cancellable = true)
-    private <I extends RecipeInput, T extends Recipe<I>> void fastsuite$parallelGetRecipesFor(RecipeType<T> type, I container, Level level, CallbackInfoReturnable<Stream<RecipeHolder<T>>> cir) {
-        if (container.isEmpty()) {
-            return; // let vanilla return Stream.empty()
-        }
-
-        Collection<RecipeHolder<T>> recipes = this.byType(type);
-        if (recipes.size() < FastSuite.MIN_SIZE_REQUIRED_FOR_THREADING || FastSuite.singleThreadedLookups.contains(type)) {
-            return; // below threshold or blacklisted: let vanilla match serially
+    private <I extends RecipeInput, T extends Recipe<I>> void fastsuite$indexedGetRecipesFor(RecipeType<T> type, I container, Level level, CallbackInfoReturnable<Stream<RecipeHolder<T>>> cir) {
+        if (type != RecipeType.CRAFTING || container.isEmpty() || FastSuite.singleThreadedLookups.contains(type)) {
+            return; // only crafting is indexed; everything else (and empty inputs) falls through to vanilla
         }
 
         CachedRecipeList<I, T> cached = this.getCachedList(type);
-        cir.setReturnValue(cached.getRecipesFor(container, level).stream());
+        cir.setReturnValue(cached.getRecipesFor(container, level));
     }
 
     @Unique

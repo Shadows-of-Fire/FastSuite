@@ -5,19 +5,23 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
-import org.spongepowered.asm.mixin.Unique;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import com.google.common.base.Stopwatch;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
@@ -27,9 +31,9 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
 /**
- * A cached list of recipes for a specific recipe type. This class is used to speed up recipe lookups by pre-sorting recipes into parallel and serial lists.
+ * A per-type recipe index that narrows a lookup to the recipes that could plausibly match the input, rather than scanning every recipe of the type.
  * <p>
- * A recipe is parallelizable if the recipe class and all ingredients are known to be thread-safe. All vanilla recipes are considered thread-safe.
+ * This significantly reduces the amount of work done during matching, especially when matching the entire recipe list (i.e. when Polymorph is in use).
  */
 @SuppressWarnings("deprecation")
 public class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
@@ -38,89 +42,128 @@ public class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
     static final Map<Class<?>, Boolean> ingredientClassCache = Collections.synchronizedMap(new IdentityHashMap<>());
 
     // Neo implements recipe priorities at the RecipeManager level, but we don't have that context here.
-    // The effective priorities are the iteration order, so we need to compute that and preserve it to re-order after matching.
+    // The effective priorities are the iteration order, so we preserve it to re-order results after matching.
     private final Object2IntMap<RecipeHolder<T>> effectivePriorities = new Object2IntOpenHashMap<>();
-    private final List<RecipeHolder<T>> serialRecipes;
-    private final List<RecipeHolder<T>> parallelRecipes;
-    private final RecipeType<T> type;
+
+    /** Indexable recipes, filed under each item their pivot (most-selective) ingredient accepts. */
+    private final Reference2ObjectMap<Item, List<RecipeHolder<T>>> byPivotItem = new Reference2ObjectOpenHashMap<>();
+
+    /** Recipes that can't be statically indexed (special recipes, or unsafe class/ingredients); matched on every lookup. */
+    private final List<RecipeHolder<T>> alwaysCheck = new ArrayList<>();
 
     public CachedRecipeList(RecipeType<T> type, Collection<RecipeHolder<T>> recipes) {
-        this.type = type;
-        this.serialRecipes = new ArrayList<>();
-        this.parallelRecipes = new ArrayList<>();
         Stopwatch watch = Stopwatch.createStarted();
         for (RecipeHolder<T> holder : recipes) {
-            if (isParallelRecipe(holder.value())) {
-                this.parallelRecipes.add(holder);
+            // File each recipe under its iteration index so the ascending sort below restores the original (vanilla byType) order.
+            this.effectivePriorities.put(holder, this.effectivePriorities.size());
+
+            Ingredient pivot = selectPivot(holder.value());
+            if (pivot == null) {
+                this.alwaysCheck.add(holder);
             }
             else {
-                this.serialRecipes.add(holder);
+                pivot.items().forEach(item -> this.byPivotItem.computeIfAbsent(item.value(), k -> new ArrayList<>()).add(holder));
             }
-
-            this.effectivePriorities.put(holder, recipes.size() - this.effectivePriorities.size());
         }
         watch.stop();
-        FastSuite.LOGGER.info("Constructed recipe list for {} in {}. {}/{} recipes are parallelized.",
-            BuiltInRegistries.RECIPE_TYPE.getKey(type), watch, this.parallelRecipes.size(), recipes.size());
+        FastSuite.LOGGER.info("Indexed recipes for {} in {}. {}/{} recipes are indexed, {} always-checked.",
+            BuiltInRegistries.RECIPE_TYPE.getKey(type), watch, recipes.size() - this.alwaysCheck.size(), recipes.size(), this.alwaysCheck.size());
     }
 
     /**
-     * Matches all recipes for the given input and level. Recipes deemed "safe" are matched in parallel, and then recipes deemed "unsafe" are matched serially
-     * afterwards.
+     * Returns a (sorted) stream of all recipes that should be checked to match the given input.
+     * <p>
+     * This is the join of any recipes whose pivot is one of the items in the input, plus {@link #alwaysCheck}.
      */
-    public List<RecipeHolder<T>> getRecipesFor(C inv, Level level) {
-        Predicate<RecipeHolder<T>> recipeFilter = (recipe) -> {
-            return recipe.value().matches(inv, level);
+    public Stream<RecipeHolder<T>> getRecipesFor(C inv, Level level) {
+        List<RecipeHolder<T>> candidates = new ArrayList<>(this.gatherCandidates(inv));
+        candidates.sort(Comparator.comparingInt(this.effectivePriorities));
+
+        return this.mergeByPriority(candidates, this.alwaysCheck)
+            .filter(rh -> rh.value().matches(inv, level));
+    }
+
+    /**
+     * Lazily merges two priority-sorted, disjoint recipe lists into one priority-ordered stream, so {@code findFirst} can short-circuit without sorting (or even
+     * matching) the rest of the always-check bucket.
+     */
+    private Stream<RecipeHolder<T>> mergeByPriority(List<RecipeHolder<T>> a, List<RecipeHolder<T>> b) {
+        Iterator<RecipeHolder<T>> merged = new Iterator<>(){
+            private int i = 0;
+            private int j = 0;
+
+            @Override
+            public boolean hasNext() {
+                return this.i < a.size() || this.j < b.size();
+            }
+
+            @Override
+            public RecipeHolder<T> next() {
+                if (this.j == b.size() || (this.i < a.size() && effectivePriorities.getInt(a.get(this.i)) <= effectivePriorities.getInt(b.get(this.j)))) {
+                    return a.get(this.i++);
+                }
+                return b.get(this.j++);
+            }
         };
 
-        try {
-            this.lockAllStacks(inv, true);
-            List<RecipeHolder<T>> matches = StreamUtils.<List<RecipeHolder<T>>>executeUntil(() -> this.parallelRecipes
-                .parallelStream()
-                .filter(recipeFilter)
-                .collect(Collectors.toCollection(ArrayList::new)),
-                FastSuite.maxRecipeLookupTime, TimeUnit.SECONDS, Collections.emptyList(), () -> timeoutMsg(type));
-
-            matches.addAll(this.serialRecipes.stream().filter(recipeFilter).toList());
-
-            matches.sort(Comparator.comparingInt(this.effectivePriorities));
-
-            return matches;
-        }
-        catch (Exception ex) {
-            throw ex;
-        }
-        finally {
-            this.lockAllStacks(inv, false);
-        }
+        long size = (long) a.size() + b.size();
+        return StreamSupport.stream(Spliterators.spliterator(merged, size, Spliterator.ORDERED), false);
     }
 
     /**
-     * Checks if a recipe is parallelizable. A recipe is parallelizable if the recipe class and all ingredients are known to be thread-safe.
-     * <p>
-     * Mods can register known safe classes by using {@link FastSuite#registerSafeRecipeClass(Class)} and {@link FastSuite#registerSafeIngredientClass(Class)}.
+     * Collects the (deduplicated) indexed recipes that could match the given input - those filed under any item present in the input.
      */
-    private boolean isParallelRecipe(T recipe) {
-        if (!isSafeRecipeClass(recipe.getClass())) {
-            return false;
+    private ObjectOpenHashSet<RecipeHolder<T>> gatherCandidates(C inv) {
+        ObjectOpenHashSet<RecipeHolder<T>> candidates = new ObjectOpenHashSet<>();
+        int size = inv.size();
+        for (int i = 0; i < size; i++) {
+            ItemStack stack = inv.getItem(i);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            List<RecipeHolder<T>> bucket = this.byPivotItem.get(stack.getItem());
+            if (bucket != null) {
+                candidates.addAll(bucket);
+            }
         }
-
-        for (Ingredient ingredient : recipe.placementInfo().ingredients()) {
-            if (!isSafeIngredient(ingredient))
-                return false;
-        }
-        return true;
+        return candidates;
     }
 
     /**
-     * Checks if a recipe class is parallelizable. All vanilla recipe classes are safe.
+     * Selects a pivot for a given recipe. The pivot is only selectable if the recipe is "safe" (vanilla class, vanilla ingredients, not special).
+     */
+    private static Ingredient selectPivot(Recipe<?> recipe) {
+        if (!isSafeRecipeClass(recipe.getClass()) || recipe.isSpecial()) {
+            return null;
+        }
+
+        Ingredient pivot = null;
+        long fewest = Long.MAX_VALUE;
+        for (Ingredient ingredient : recipe.placementInfo().ingredients()) {
+            if (!isSafeIngredient(ingredient)) {
+                return null;
+            }
+            long count = ingredient.items().count();
+            if (count == 0) {
+                return null; // can't file an ingredient that accepts nothing
+            }
+            if (count < fewest) {
+                fewest = count;
+                pivot = ingredient;
+            }
+        }
+        return pivot; // null when the recipe has no placeable ingredients (special recipe)
+    }
+
+    /**
+     * Checks if a recipe class is safe to index. All vanilla recipe classes are safe.
      */
     private static boolean isSafeRecipeClass(Class<?> clz) {
         return parallelRecipeClassCache.computeIfAbsent(clz, c -> c.getName().startsWith("net.minecraft.world.item.crafting."));
     }
 
     /**
-     * Checks if an Ingredient is parallelizable. All vanilla and Forge ingredients are safe.
+     * Checks if an Ingredient is safe to index. All vanilla and NeoForge ingredients are safe.
      */
     private static boolean isSafeIngredient(Ingredient ingredient) {
         if (!ingredient.isCustom())
@@ -128,28 +171,5 @@ public class CachedRecipeList<C extends RecipeInput, T extends Recipe<C>> {
         return ingredientClassCache.computeIfAbsent(ingredient.getCustomIngredient().getClass(), clz -> {
             return clz.getName().startsWith("net.neoforged.neoforge.common.crafting.");
         });
-    }
-
-    static String timeoutMsg(RecipeType<?> type) {
-        return String.format("Multithreaded recipe lookup took longer than %d seconds - aborting and returning nothing. Consider blacklisting this recipe type (%s) in the config.", FastSuite.maxRecipeLookupTime,
-            BuiltInRegistries.RECIPE_TYPE.getKey(type));
-    }
-
-    /**
-     * If {@link FastSuite#lockInputStacks} is enabled, modifies the locked state of all stacks in the given recipe input.
-     *
-     * @param inv    The recipe input to modify the stacks of.
-     * @param locked Whether to lock or unlock the stacks.
-     */
-    @Unique
-    private void lockAllStacks(C inv, boolean locked) {
-        if (FastSuite.lockInputStacks) {
-            for (int i = 0; i < inv.size(); i++) {
-                ItemStack s = inv.getItem(i);
-                if (!s.isEmpty()) {
-                    ((ILockableItemStack) (Object) s).setLocked(locked);
-                }
-            }
-        }
     }
 }
