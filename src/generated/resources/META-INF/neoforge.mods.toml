@@ -14,7 +14,7 @@ displayName="Fast Suite"
 
 authors="Shadows_of_Fire"
 
-description='''Introduces multithreading to the json recipe system.'''
+description='''Improves recipe performance through indexing.'''
 
 [[mixins]]
 config="fastsuite.mixins.json"
